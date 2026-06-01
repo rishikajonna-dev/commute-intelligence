@@ -34,7 +34,7 @@ Every evening, the dashboard shows coordinators:
 
 **Scenario selector:**
 - Live Data — real API calls
-- 🌧Rainy Friday — simulated high-risk conditions
+- Rainy Friday — simulated high-risk conditions
 - Month-end Rush — simulated elevated conditions
 
 ---
