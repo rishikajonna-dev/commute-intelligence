@@ -73,7 +73,7 @@ async function readErr(res) {
 function logErr(api, ctx, err) { console.error(`${api} API error`, { ctx, ...err }); }
 
 async function fetchRouteEta(route) {
-  const key = process.env.REACT_APP_ORS_KEY;
+  const key = import.meta.env.REACT_APP_ORS_KEY;
   if (!key) throw { status: "missing-key", body: "REACT_APP_ORS_KEY not set" };
   const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${key}&start=${route.start.lng},${route.start.lat}&end=${route.end.lng},${route.end.lat}`;
   const res = await fetch(url); if (!res.ok) throw await readErr(res);
@@ -84,7 +84,7 @@ async function fetchRouteEta(route) {
 }
 
 async function fetchRainProbability() {
-  const key = process.env.REACT_APP_OWM_KEY;
+  const key = import.meta.env.REACT_APP_OWM_KEY;
   if (!key) throw { status: "missing-key", body: "REACT_APP_OWM_KEY not set" };
   const url = `https://api.openweathermap.org/data/2.5/forecast?q=Hyderabad,IN&appid=${key}&units=metric`;
   const res = await fetch(url); if (!res.ok) throw await readErr(res);
