@@ -10,10 +10,14 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "REACT_APP_ORS_KEY environment variable is not configured" });
   }
 
-  const url = `https://api.heigit.org/openrouteservice/v2/directions/driving-car?api_key=${key}&start=${start}&end=${end}`;
+  const url = `https://api.heigit.org/openrouteservice/v2/directions/driving-car?start=${start}&end=${end}`;
 
   try {
-    const apiRes = await fetch(url);
+    const apiRes = await fetch(url, {
+      headers: {
+        "Authorization": key,
+      },
+    });
     if (!apiRes.ok) {
       let body = "";
       try {
