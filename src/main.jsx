@@ -2,34 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 
+// ── Data ──────────────────────────────────────────────────────────────────────
+
 const routes = [
-  {
-    id: "vanasthalipuram-madhapur",
-    name: "Vanasthalipuram → Madhapur",
-    start: { lng: 78.5746, lat: 17.3254 },
-    end: { lng: 78.3915, lat: 17.4483 },
-    baseline: 60,
-    usualDeparture: "7:00am",
-    shiftStart: "8:00am",
-  },
-  {
-    id: "miyapur-gachibowli",
-    name: "Miyapur → Gachibowli",
-    start: { lng: 78.3496, lat: 17.4956 },
-    end: { lng: 78.3489, lat: 17.4401 },
-    baseline: 38,
-    usualDeparture: "7:50am",
-    shiftStart: "8:30am",
-  },
-  {
-    id: "lb-nagar-secunderabad",
-    name: "LB Nagar → Secunderabad",
-    start: { lng: 78.5518, lat: 17.3469 },
-    end: { lng: 78.4983, lat: 17.4399 },
-    baseline: 39,
-    usualDeparture: "7:05am",
-    shiftStart: "7:45am",
-  },
+  { id: "vanasthalipuram-madhapur", name: "Vanasthalipuram → Madhapur", start: { lng: 78.5746, lat: 17.3254 }, end: { lng: 78.3915, lat: 17.4483 }, baseline: 60, usualDeparture: "7:00am", shiftStart: "8:00am" },
+  { id: "miyapur-gachibowli", name: "Miyapur → Gachibowli", start: { lng: 78.3496, lat: 17.4956 }, end: { lng: 78.3489, lat: 17.4401 }, baseline: 38, usualDeparture: "7:50am", shiftStart: "8:30am" },
+  { id: "lb-nagar-secunderabad", name: "LB Nagar → Secunderabad", start: { lng: 78.5518, lat: 17.3469 }, end: { lng: 78.4983, lat: 17.4399 }, baseline: 39, usualDeparture: "7:05am", shiftStart: "7:45am" },
 ];
 
 const scorecardRows = [
@@ -38,7 +16,12 @@ const scorecardRows = [
   ["LB Nagar → Secunderabad", "Normal", "+6 min"],
 ];
 
-const navItems = ["Dashboard", "Routes", "Alerts", "Settings"];
+const navItems = [
+  { label: "Dashboard", active: true },
+  { label: "Routes", active: false },
+  { label: "Alerts", active: false },
+  { label: "Settings", active: false },
+];
 
 const shiftStartOptions = [
   { label: "7:00 AM", value: "7:00am" },
@@ -51,418 +34,145 @@ const shiftStartOptions = [
 
 const scenarios = [
   { id: "live", label: "Live Data" },
-  { id: "rainy-friday", label: "🌧 Rainy Friday" },
-  { id: "month-end", label: "📅 Month-end Rush" },
+  { id: "rainy-friday", label: "Rainy Friday" },
+  { id: "month-end", label: "Month-end Rush" },
 ];
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function formatToday(date = new Date()) {
-  return new Intl.DateTimeFormat("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
+  return new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date);
 }
-
 function formatTomorrow(date = new Date()) {
-  const tomorrow = new Date(date);
-  tomorrow.setDate(date.getDate() + 1);
-  return formatToday(tomorrow);
+  const t = new Date(date); t.setDate(date.getDate() + 1); return formatToday(t);
 }
-
 function tomorrowDateKey(date = new Date()) {
-  const tomorrow = new Date(date);
-  tomorrow.setDate(date.getDate() + 1);
-  const year = tomorrow.getFullYear();
-  const month = String(tomorrow.getMonth() + 1).padStart(2, "0");
-  const day = String(tomorrow.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const t = new Date(date); t.setDate(date.getDate() + 1);
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
 }
-
 function parseClockToMinutes(time) {
-  const match = time.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
-  if (!match) return 0;
-
-  let hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  const meridian = match[3].toLowerCase();
-
-  if (meridian === "pm" && hours !== 12) hours += 12;
-  if (meridian === "am" && hours === 12) hours = 0;
-
-  return hours * 60 + minutes;
+  const m = time.match(/^(\d{1,2}):(\d{2})(am|pm)$/i); if (!m) return 0;
+  let h = Number(m[1]); const min = Number(m[2]); const mer = m[3].toLowerCase();
+  if (mer === "pm" && h !== 12) h += 12; if (mer === "am" && h === 12) h = 0;
+  return h * 60 + min;
 }
-
-function formatMinutesAsClock(totalMinutes) {
-  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-  const hours24 = Math.floor(normalized / 60);
-  const minutes = normalized % 60;
-  const meridian = hours24 >= 12 ? "PM" : "AM";
-  const hours12 = hours24 % 12 || 12;
-
-  return `${hours12}:${String(minutes).padStart(2, "0")} ${meridian}`;
+function formatMinutesAsClock(total) {
+  const n = ((total % 1440) + 1440) % 1440;
+  const h24 = Math.floor(n / 60); const min = n % 60;
+  const mer = h24 >= 12 ? "PM" : "AM"; const h12 = h24 % 12 || 12;
+  return `${h12}:${String(min).padStart(2,"0")} ${mer}`;
 }
+function roundToFive(m) { return Math.round(m / 5) * 5; }
+function getRecMinutes(shiftStart, predicted) { return roundToFive(parseClockToMinutes(shiftStart) - predicted - 10); }
+function getRecDeparture(shiftStart, predicted) { return formatMinutesAsClock(getRecMinutes(shiftStart, predicted)); }
 
-function roundToNearestFive(minutes) {
-  return Math.round(minutes / 5) * 5;
+async function readErr(res) {
+  let body = ""; try { body = await res.text(); } catch(e) { body = e.message; }
+  return { status: res.status, statusText: res.statusText, body };
 }
-
-function getRecommendedDepartureMinutes(selectedShiftStart, predictedMinutes) {
-  return roundToNearestFive(parseClockToMinutes(selectedShiftStart) - predictedMinutes - 10);
-}
-
-function getRecommendedDeparture(selectedShiftStart, predictedMinutes) {
-  return formatMinutesAsClock(getRecommendedDepartureMinutes(selectedShiftStart, predictedMinutes));
-}
-
-async function readErrorDetails(response) {
-  let body = "";
-
-  try {
-    body = await response.text();
-  } catch (error) {
-    body = `Unable to read response body: ${error.message}`;
-  }
-
-  return {
-    status: response.status,
-    statusText: response.statusText,
-    body,
-  };
-}
-
-function logApiError(apiName, context, error) {
-  console.error(`${apiName} API error`, {
-    context,
-    status: error.status,
-    responseBody: error.body,
-    error,
-  });
-}
+function logErr(api, ctx, err) { console.error(`${api} API error`, { ctx, ...err }); }
 
 async function fetchRouteEta(route) {
   const key = process.env.REACT_APP_ORS_KEY;
-
-  if (!key) {
-    throw {
-      status: "missing-key",
-      body: "REACT_APP_ORS_KEY is not configured",
-      message: "Missing OpenRouteService API key",
-    };
-  }
-
+  if (!key) throw { status: "missing-key", body: "REACT_APP_ORS_KEY not set" };
   const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${key}&start=${route.start.lng},${route.start.lat}&end=${route.end.lng},${route.end.lat}`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw await readErrorDetails(response);
-  }
-
-  const payload = await response.json();
-  const durationSeconds = payload?.features?.[0]?.properties?.summary?.duration;
-
-  if (!Number.isFinite(durationSeconds)) {
-    throw {
-      status: "invalid-response",
-      body: JSON.stringify(payload),
-      message: "No duration field found in OpenRouteService response",
-    };
-  }
-
-  return Math.round((durationSeconds / 60) * 1.6);
+  const res = await fetch(url); if (!res.ok) throw await readErr(res);
+  const data = await res.json();
+  const sec = data?.features?.[0]?.properties?.summary?.duration;
+  if (!Number.isFinite(sec)) throw { status: "invalid", body: JSON.stringify(data) };
+  return Math.round((sec / 60) * 1.6);
 }
 
 async function fetchRainProbability() {
   const key = process.env.REACT_APP_OWM_KEY;
-
-  if (!key) {
-    throw {
-      status: "missing-key",
-      body: "REACT_APP_OWM_KEY is not configured",
-      message: "Missing OpenWeatherMap API key",
-    };
-  }
-
+  if (!key) throw { status: "missing-key", body: "REACT_APP_OWM_KEY not set" };
   const url = `https://api.openweathermap.org/data/2.5/forecast?q=Hyderabad,IN&appid=${key}&units=metric`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw await readErrorDetails(response);
-  }
-
-  const payload = await response.json();
-  const dateKey = tomorrowDateKey();
-  const morningForecasts = (payload.list || []).filter((entry) => {
-    const dtText = entry.dt_txt || "";
-    const hour = Number(dtText.slice(11, 13));
-    return dtText.includes(dateKey) && hour >= 6 && hour <= 9;
-  });
-
-  if (morningForecasts.length === 0) return 0;
-
-  const totalPop = morningForecasts.reduce((sum, entry) => sum + Number(entry.pop || 0), 0);
-  return totalPop / morningForecasts.length;
+  const res = await fetch(url); if (!res.ok) throw await readErr(res);
+  const data = await res.json();
+  const dk = tomorrowDateKey();
+  const forecasts = (data.list || []).filter(e => { const h = Number((e.dt_txt||"").slice(11,13)); return (e.dt_txt||"").includes(dk) && h >= 6 && h <= 9; });
+  if (!forecasts.length) return 0;
+  return forecasts.reduce((s,e) => s + Number(e.pop||0), 0) / forecasts.length;
 }
 
-function scoreRoute(
-  route,
-  predictedMinutes,
-  rainProbability,
-  trafficUnavailable,
-  weatherUnavailable,
-  selectedShiftStart,
-  scenarioFlags = {},
-) {
-  let score = 0;
-  const signals = [];
-  const isEveningShift = selectedShiftStart === "5:00pm" || selectedShiftStart === "6:00pm";
-  const isNightShift = selectedShiftStart === "10:00pm";
-  const isFridayPattern = scenarioFlags.forceFriday || new Date().getDay() === 4;
-  const isMonthEnd = scenarioFlags.forceMonthEnd || new Date().getDate() >= 25 || new Date().getDate() <= 2;
-
-  if (!isNightShift && !trafficUnavailable && predictedMinutes > route.baseline * 1.3) {
-    score += 30;
-    signals.push("Traffic above normal");
-  }
-
-  if (!weatherUnavailable && rainProbability > 0.6) {
-    score += 25;
-    signals.push("Rain forecast tomorrow");
-  }
-
-  if (!isEveningShift && !isNightShift && isFridayPattern) {
-    score += 15;
-    signals.push("Friday pattern");
-  }
-
-  if (isEveningShift) {
-    score += 15;
-    signals.push("Evening peak hours +15");
-  }
-
-  if (!isNightShift && isMonthEnd) {
-    score += 10;
-    signals.push("Month-end traffic");
-  }
-
-  if (trafficUnavailable) {
-    signals.push("Traffic data unavailable");
-  }
-
-  const riskLevel = score <= 35 ? "Normal" : score <= 65 ? "Elevated" : "High";
-  return { signals, riskLevel };
+function scoreRoute(route, predicted, rainProb, trafficOut, weatherOut, shiftStart, flags = {}) {
+  let score = 0; const signals = [];
+  const evening = shiftStart === "5:00pm" || shiftStart === "6:00pm";
+  const night = shiftStart === "10:00pm";
+  const friday = flags.forceFriday || new Date().getDay() === 4;
+  const monthEnd = flags.forceMonthEnd || new Date().getDate() >= 25 || new Date().getDate() <= 2;
+  if (!night && !trafficOut && predicted > route.baseline * 1.3) { score += 30; signals.push("Traffic above normal"); }
+  if (!weatherOut && rainProb > 0.6) { score += 25; signals.push("Rain forecast"); }
+  if (!evening && !night && friday) { score += 15; signals.push("Friday pattern"); }
+  if (evening) { score += 15; signals.push("Evening peak hours"); }
+  if (!night && monthEnd) { score += 10; signals.push("Month-end traffic"); }
+  if (trafficOut) signals.push("Traffic data unavailable");
+  return { signals, riskLevel: score <= 35 ? "Normal" : score <= 65 ? "Elevated" : "High" };
 }
 
-function getScenarioRouteState(routeState, scenario) {
-  if (scenario === "rainy-friday") {
-    return {
-      ...routeState,
-      loading: false,
-      predictedMinutes: Math.round(routeState.route.baseline * 1.5),
-      trafficUnavailable: false,
-    };
-  }
+function applyScenario(rs, scenario) {
+  if (scenario === "rainy-friday") return { ...rs, loading: false, predictedMinutes: Math.round(rs.route.baseline * 1.5), trafficUnavailable: false };
+  if (scenario === "month-end") return { ...rs, loading: false, predictedMinutes: Math.round(rs.route.baseline * 1.45), trafficUnavailable: false };
+  return rs;
+}
+function scenarioRain(rain, scenario) { return scenario === "rainy-friday" ? 0.85 : rain; }
+function scenarioFlags(scenario) { return { forceFriday: scenario === "rainy-friday", forceMonthEnd: scenario === "month-end" }; }
 
-  if (scenario === "month-end") {
-    return {
-      ...routeState,
-      loading: false,
-      predictedMinutes: Math.round(routeState.route.baseline * 1.45),
-      trafficUnavailable: false,
-    };
-  }
-
-  return routeState;
+// Risk only uses red/amber/green. Everything else is blue (#2563eb) or neutral.
+function riskColor(level) {
+  if (level === "High")     return { bar: "#ef4444", dot: "#ef4444", text: "#b91c1c", badge: "bg-red-50 text-red-700",     ring: "ring-red-200" };
+  if (level === "Elevated") return { bar: "#f59e0b", dot: "#f59e0b", text: "#92400e", badge: "bg-amber-50 text-amber-700", ring: "ring-amber-200" };
+  return                           { bar: "#10b981", dot: "#10b981", text: "#065f46", badge: "bg-emerald-50 text-emerald-700", ring: "ring-emerald-200" };
 }
 
-function getScenarioRainProbability(rainProbability, scenario) {
-  return scenario === "rainy-friday" ? 0.85 : rainProbability;
-}
-
-function getScenarioFlags(scenario) {
-  return {
-    forceFriday: scenario === "rainy-friday",
-    forceMonthEnd: scenario === "month-end",
-  };
-}
-
-function badgeClass(riskLevel) {
-  if (riskLevel === "High") return "bg-red-50 text-[#dc2626]";
-  if (riskLevel === "Elevated") return "bg-amber-50 text-[#d97706]";
-  return "bg-green-50 text-[#16a34a]";
-}
-
-function riskTextClass(riskLevel) {
-  if (riskLevel === "High") return "text-[#dc2626]";
-  if (riskLevel === "Elevated") return "text-[#d97706]";
-  return "text-[#16a34a]";
-}
-
-function riskAccentClass(riskLevel) {
-  if (riskLevel === "High") return "border-l-[#dc2626]";
-  if (riskLevel === "Elevated") return "border-l-[#d97706]";
-  return "border-l-[#16a34a]";
-}
-
-function predictedTextClass(ratio) {
-  if (ratio >= 1.3) return "text-[#dc2626]";
-  if (ratio > 1) return "text-[#d97706]";
-  return "text-gray-400";
-}
-
-function riskDotClass(riskLevel) {
-  if (riskLevel === "High") return "bg-[#dc2626]";
-  if (riskLevel === "Elevated") return "bg-[#d97706]";
-  return "bg-[#16a34a]";
-}
+// ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
-  const [routeStates, setRouteStates] = useState(() =>
-    routes.map((route) => ({
-      route,
-      loading: true,
-      predictedMinutes: null,
-      trafficUnavailable: false,
-    })),
-  );
-  const [rainProbability, setRainProbability] = useState(0);
+  const [routeStates, setRouteStates] = useState(() => routes.map(r => ({ route: r, loading: true, predictedMinutes: null, trafficUnavailable: false })));
+  const [rainProb, setRainProb] = useState(0);
   const [trafficFailed, setTrafficFailed] = useState(false);
   const [weatherFailed, setWeatherFailed] = useState(false);
-  const [selectedShiftStart, setSelectedShiftStart] = useState("8:00am");
-  const [selectedScenario, setSelectedScenario] = useState("live");
+  const [shiftStart, setShiftStart] = useState("8:00am");
+  const [scenario, setScenario] = useState("live");
 
   useEffect(() => {
-    let active = true;
-
-    async function loadDashboardData() {
-      fetchRainProbability()
-        .then((probability) => {
-          if (active) setRainProbability(probability);
-        })
-        .catch((error) => {
-          logApiError("OpenWeatherMap", "Hyderabad forecast", error);
-          if (!active) return;
-          setWeatherFailed(true);
-          setRainProbability(0);
-        });
-
-      const results = await Promise.all(
-        routes.map(async (route) => {
-          try {
-            const predictedMinutes = await fetchRouteEta(route);
-            return { route, loading: false, predictedMinutes, trafficUnavailable: false };
-          } catch (error) {
-            logApiError("OpenRouteService", route.name, error);
-            if (active) setTrafficFailed(true);
-            return { route, loading: false, predictedMinutes: null, trafficUnavailable: true };
-          }
-        }),
-      );
-
-      if (active) setRouteStates(results);
-    }
-
-    loadDashboardData();
-
-    return () => {
-      active = false;
-    };
+    let alive = true;
+    fetchRainProbability().then(p => { if (alive) setRainProb(p); }).catch(e => { logErr("OWM","forecast",e); if (alive) { setWeatherFailed(true); setRainProb(0); } });
+    Promise.all(routes.map(async r => {
+      try { const m = await fetchRouteEta(r); return { route: r, loading: false, predictedMinutes: m, trafficUnavailable: false }; }
+      catch(e) { logErr("ORS", r.name, e); if (alive) setTrafficFailed(true); return { route: r, loading: false, predictedMinutes: null, trafficUnavailable: true }; }
+    })).then(results => { if (alive) setRouteStates(results); });
+    return () => { alive = false; };
   }, []);
 
-  const todayLabel = useMemo(() => formatToday(), []);
-  const tomorrowLabel = useMemo(() => formatTomorrow(), []);
-  const effectiveRouteStates = useMemo(
-    () => routeStates.map((routeState) => getScenarioRouteState(routeState, selectedScenario)),
-    [routeStates, selectedScenario],
-  );
-  const effectiveRainProbability = getScenarioRainProbability(rainProbability, selectedScenario);
-  const scenarioFlags = useMemo(() => getScenarioFlags(selectedScenario), [selectedScenario]);
-  const routeSummaries = useMemo(
-    () =>
-      effectiveRouteStates
-        .filter((routeState) => !routeState.loading)
-        .map((routeState) => {
-          const scoringMinutes = routeState.trafficUnavailable ? routeState.route.baseline : routeState.predictedMinutes;
-          const { riskLevel } = scoreRoute(
-            routeState.route,
-            scoringMinutes,
-            effectiveRainProbability,
-            routeState.trafficUnavailable,
-            weatherFailed,
-            selectedShiftStart,
-            scenarioFlags,
-          );
+  const todayLabel     = useMemo(() => formatToday(), []);
+  const tomorrowLabel  = useMemo(() => formatTomorrow(), []);
+  const effStates      = useMemo(() => routeStates.map(rs => applyScenario(rs, scenario)), [routeStates, scenario]);
+  const effRain        = scenarioRain(rainProb, scenario);
+  const flags          = useMemo(() => scenarioFlags(scenario), [scenario]);
 
-          return {
-            riskLevel,
-            departureMinutes: getRecommendedDepartureMinutes(selectedShiftStart, scoringMinutes),
-          };
-        }),
-    [effectiveRouteStates, effectiveRainProbability, scenarioFlags, selectedShiftStart, weatherFailed],
-  );
+  const summaries = useMemo(() => effStates.filter(rs => !rs.loading).map(rs => {
+    const mins = rs.trafficUnavailable ? rs.route.baseline : rs.predictedMinutes;
+    const { riskLevel } = scoreRoute(rs.route, mins, effRain, rs.trafficUnavailable, weatherFailed, shiftStart, flags);
+    return { riskLevel, depMins: getRecMinutes(shiftStart, mins) };
+  }), [effStates, effRain, flags, shiftStart, weatherFailed]);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-gray-900">
+    <div className="min-h-screen bg-[#f0f2f5] text-gray-900" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <Sidebar />
-
       <main className="min-h-screen lg:pl-[240px]">
-        <header className="border-b border-gray-100 bg-white px-5 py-5 sm:px-8">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-xl font-semibold text-gray-950">Dashboard</h1>
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-sm font-medium text-gray-500">{todayLabel}</p>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-500">
-                Shift Start:
-                <select
-                  value={selectedShiftStart}
-                  onChange={(event) => setSelectedShiftStart(event.target.value)}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm outline-none transition hover:border-gray-300 focus:border-[#6366f1] focus:ring-2 focus:ring-indigo-100"
-                >
-                  {shiftStartOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-[#16a34a]">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-[#16a34a]" />
-                Live Data
-              </span>
-            </div>
+        <Header todayLabel={todayLabel} shiftStart={shiftStart} setShiftStart={setShiftStart} />
+        <div className="px-6 py-6 sm:px-8 lg:py-8">
+          {(trafficFailed || weatherFailed) && <WarningBanners trafficFailed={trafficFailed} weatherFailed={weatherFailed} />}
+          <ScenarioSelector scenario={scenario} setScenario={setScenario} />
+          <SectionHeader label="Tomorrow's Route Risk" sub={tomorrowLabel} />
+          <SummaryBar summaries={summaries} />
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {effStates.map(rs => rs.loading
+              ? <RouteSkeleton key={rs.route.id} />
+              : <RouteCard key={rs.route.id} rs={rs} rainProb={effRain} weatherOut={weatherFailed} shiftStart={shiftStart} flags={flags} />
+            )}
           </div>
-        </header>
-
-        <div className="px-5 py-6 sm:px-8 lg:py-8">
-          <WarningBanners trafficFailed={trafficFailed} weatherFailed={weatherFailed} />
-          <ScenarioSelector selectedScenario={selectedScenario} onSelectScenario={setSelectedScenario} />
-
-          <section>
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold text-gray-800">Tomorrow&apos;s Route Risk</h2>
-              <p className="mt-1 text-sm text-gray-400">{tomorrowLabel}</p>
-            </div>
-
-            <SummaryBar routeSummaries={routeSummaries} />
-
-            <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
-              {effectiveRouteStates.map((routeState) =>
-                routeState.loading ? (
-                  <RouteSkeleton key={routeState.route.id} />
-                ) : (
-                  <RouteCard
-                    key={routeState.route.id}
-                    routeState={routeState}
-                    rainProbability={effectiveRainProbability}
-                    weatherUnavailable={weatherFailed}
-                    selectedShiftStart={selectedShiftStart}
-                    scenarioFlags={scenarioFlags}
-                  />
-                ),
-              )}
-            </div>
-          </section>
-
           <PerformanceTable />
         </div>
       </main>
@@ -470,226 +180,232 @@ function App() {
   );
 }
 
-function ScenarioSelector({ selectedScenario, onSelectScenario }) {
-  const isDemoMode = selectedScenario !== "live";
-
-  return (
-    <div className="pb-5">
-      <div className="flex flex-wrap gap-3 py-4">
-        {scenarios.map((scenario) => {
-          const active = scenario.id === selectedScenario;
-          return (
-            <button
-              key={scenario.id}
-              type="button"
-              onClick={() => onSelectScenario(scenario.id)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                active ? "bg-indigo-600 text-white" : "border border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-              }`}
-            >
-              {scenario.label}
-            </button>
-          );
-        })}
-      </div>
-      {isDemoMode && <p className="text-sm font-medium text-gray-400">Demo mode — simulated conditions</p>}
-    </div>
-  );
-}
-
-function SummaryBar({ routeSummaries }) {
-  if (routeSummaries.length === 0) return null;
-
-  const highCount = routeSummaries.filter((summary) => summary.riskLevel === "High").length;
-  const elevatedCount = routeSummaries.filter((summary) => summary.riskLevel !== "Normal").length;
-
-  if (highCount > 0) {
-    return (
-      <div className="flex w-full items-center gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm font-semibold text-[#991b1b]">
-        <span>🚨</span>
-        <span>{highCount} route(s) at high risk tomorrow · Immediate action needed</span>
-      </div>
-    );
-  }
-
-  if (elevatedCount > 0) {
-    return (
-      <div className="flex w-full items-center gap-3 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm font-semibold text-[#92400e]">
-        <span>⚠️</span>
-        <span>{elevatedCount} route(s) need earlier dispatch tomorrow · Check recommendations below</span>
-      </div>
-    );
-  }
-
-  const earliestDeparture = Math.min(...routeSummaries.map((summary) => summary.departureMinutes));
-
-  return (
-    <div className="flex w-full items-center gap-3 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-sm font-semibold text-[#15803d]">
-      <span>✅</span>
-      <span>All 3 routes clear for tomorrow · Earliest departure: {formatMinutesAsClock(earliestDeparture)}</span>
-    </div>
-  );
-}
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 
 function Sidebar() {
   return (
-    <aside className="w-full bg-[#0f172a] text-white lg:fixed lg:inset-y-0 lg:left-0 lg:w-[240px]">
-      <div className="flex h-full flex-col">
-        <div className="px-6 py-6">
-          <p className="text-lg font-semibold leading-tight">⚡ Commute Intelligence</p>
-        </div>
-
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible">
-          {navItems.map((item) => {
-            const active = item === "Dashboard";
-            return (
-              <a
-                key={item}
-                href="#"
-                className={`whitespace-nowrap rounded-lg border-l-4 px-4 py-3 text-sm font-medium transition ${
-                  active
-                    ? "border-[#6366f1] bg-white/10 text-white"
-                    : "border-transparent text-slate-300 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                {item}
-              </a>
-            );
-          })}
-        </nav>
-
-        <p className="mt-auto hidden px-6 pb-6 text-xs font-medium text-slate-400 lg:block">POC v1.0 · Hyderabad</p>
+    <aside className="w-full bg-[#0f172a] text-white lg:fixed lg:inset-y-0 lg:left-0 lg:w-[240px] lg:flex lg:flex-col">
+      <div className="border-b border-white/10 px-6 py-5">
+        <p className="text-[15px] font-bold tracking-tight text-white">Commute Intelligence</p>
+        <p className="mt-0.5 text-[11px] text-slate-500 tracking-wide uppercase">Hyderabad Operations</p>
       </div>
+      <nav className="flex gap-1 overflow-x-auto px-3 py-3 lg:flex-col lg:overflow-visible">
+        {navItems.map(({ label, active }) => (
+          <a key={label} href="#" onClick={e => { if (!active) e.preventDefault(); }}
+            className={`group flex items-center justify-between rounded-md px-3 py-2.5 text-[13px] font-medium transition-all ${
+              active ? "bg-[#2563eb] text-white" : "text-slate-500 cursor-default"
+            }`}>
+            <span>{label}</span>
+            {!active && <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-600">Soon</span>}
+          </a>
+        ))}
+      </nav>
+      <p className="mt-auto hidden px-6 pb-5 text-[11px] text-slate-600 lg:block">POC v1.0 · Hyderabad</p>
     </aside>
   );
 }
 
-function WarningBanners({ trafficFailed, weatherFailed }) {
-  if (!trafficFailed && !weatherFailed) return null;
+// ── Header ────────────────────────────────────────────────────────────────────
 
+function Header({ todayLabel, shiftStart, setShiftStart }) {
   return (
-    <div className="mb-6 space-y-3">
-      {trafficFailed && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
-          ⚠️ Traffic API unavailable — travel times estimated from baseline data
+    <header className="border-b border-gray-200 bg-white px-6 py-4 sm:px-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-[16px] font-semibold text-gray-900">Dashboard</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-[13px] text-gray-400">{todayLabel}</span>
+          <label className="flex items-center gap-2 text-[13px] text-gray-500">
+            Shift Start
+            <select value={shiftStart} onChange={e => setShiftStart(e.target.value)}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-[13px] font-medium text-gray-700 outline-none transition hover:border-gray-300 focus:border-[#2563eb] focus:ring-2 focus:ring-blue-100">
+              {shiftStartOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold tracking-wide text-blue-700">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+            LIVE
+          </span>
         </div>
-      )}
-      {weatherFailed && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
-          ⚠️ Weather API unavailable — rain signal not included in today&apos;s score
-        </div>
-      )}
+      </div>
+    </header>
+  );
+}
+
+// ── Section Header ────────────────────────────────────────────────────────────
+
+function SectionHeader({ label, sub }) {
+  return (
+    <div className="mb-4">
+      <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-400">{label}</h2>
+      <p className="mt-0.5 text-[13px] text-gray-500">{sub}</p>
     </div>
   );
 }
+
+// ── Scenario Selector ─────────────────────────────────────────────────────────
+
+function ScenarioSelector({ scenario, setScenario }) {
+  return (
+    <div className="mb-6">
+      <div className="flex flex-wrap gap-2">
+        {scenarios.map(s => (
+          <button key={s.id} type="button" onClick={() => setScenario(s.id)}
+            className={`rounded-md px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
+              s.id === scenario
+                ? "bg-[#2563eb] text-white shadow-sm"
+                : "border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700"
+            }`}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {scenario !== "live" && <p className="mt-2 text-[12px] text-gray-400">Demo mode — simulated conditions</p>}
+    </div>
+  );
+}
+
+// ── Summary Bar ───────────────────────────────────────────────────────────────
+
+function SummaryBar({ summaries }) {
+  if (!summaries.length) return null;
+  const highCount = summaries.filter(s => s.riskLevel === "High").length;
+  const elevCount = summaries.filter(s => s.riskLevel !== "Normal").length;
+  const earliest  = Math.min(...summaries.map(s => s.depMins));
+
+  let msg, cls;
+  if (highCount > 0) {
+    msg = `${highCount} route${highCount > 1 ? "s" : ""} at high risk tomorrow — check recommendations below`;
+    cls = "border-l-4 border-red-400 bg-white text-red-700";
+  } else if (elevCount > 0) {
+    msg = `${elevCount} route${elevCount > 1 ? "s" : ""} need earlier dispatch tomorrow`;
+    cls = "border-l-4 border-amber-400 bg-white text-amber-700";
+  } else {
+    msg = `All 3 routes clear for tomorrow · Earliest departure ${formatMinutesAsClock(earliest)}`;
+    cls = "border-l-4 border-emerald-400 bg-white text-emerald-700";
+  }
+
+  return <div className={`mb-4 rounded-lg px-4 py-3 text-[13px] font-semibold shadow-sm ${cls}`}>{msg}</div>;
+}
+
+// ── Warning Banners ───────────────────────────────────────────────────────────
+
+function WarningBanners({ trafficFailed, weatherFailed }) {
+  return (
+    <div className="mb-5 space-y-2">
+      {trafficFailed && <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] font-medium text-amber-700">Traffic API unavailable — travel times estimated from baseline data</div>}
+      {weatherFailed && <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] font-medium text-amber-700">Weather API unavailable — rain signal excluded from scoring</div>}
+    </div>
+  );
+}
+
+// ── Route Skeleton ────────────────────────────────────────────────────────────
 
 function RouteSkeleton() {
   return (
-    <div className="rounded-2xl border-l-4 border-l-gray-200 bg-white p-6 shadow-sm">
-      <div className="animate-pulse space-y-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="h-4 w-3/4 rounded bg-gray-100" />
-          <div className="h-6 w-20 rounded-full bg-gray-200" />
-        </div>
-        <div className="h-8 w-56 rounded bg-gray-200" />
-        <div className="h-3 w-44 rounded bg-gray-100" />
-        <div className="flex gap-2">
-          <div className="h-7 w-28 rounded-full bg-gray-100" />
-          <div className="h-7 w-24 rounded-full bg-gray-100" />
-        </div>
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="animate-pulse space-y-4">
+        <div className="flex items-center justify-between"><div className="h-3 w-2/3 rounded bg-gray-100" /><div className="h-5 w-16 rounded bg-gray-100" /></div>
+        <div className="h-6 w-40 rounded bg-gray-100" />
+        <div className="h-3 w-28 rounded bg-gray-100" />
+        <div className="flex gap-2"><div className="h-5 w-24 rounded bg-gray-100" /><div className="h-5 w-20 rounded bg-gray-100" /></div>
       </div>
     </div>
   );
 }
 
-function RouteCard({ routeState, rainProbability, weatherUnavailable, selectedShiftStart, scenarioFlags }) {
-  const { route, predictedMinutes, trafficUnavailable } = routeState;
-  const scoringMinutes = trafficUnavailable ? route.baseline : predictedMinutes;
-  const { signals, riskLevel } = scoreRoute(
-    route,
-    scoringMinutes,
-    rainProbability,
-    trafficUnavailable,
-    weatherUnavailable,
-    selectedShiftStart,
-    scenarioFlags,
-  );
-  const recommendedDeparture = getRecommendedDeparture(selectedShiftStart, scoringMinutes);
-  const ratio = scoringMinutes / route.baseline;
+// ── Route Card ────────────────────────────────────────────────────────────────
+
+function RouteCard({ rs, rainProb, weatherOut, shiftStart, flags }) {
+  const { route, predictedMinutes, trafficUnavailable } = rs;
+  const mins = trafficUnavailable ? route.baseline : predictedMinutes;
+  const { signals, riskLevel } = scoreRoute(route, mins, rainProb, trafficUnavailable, weatherOut, shiftStart, flags);
+  const departure = getRecDeparture(shiftStart, mins);
+  const rc = riskColor(riskLevel);
+  const over = mins > route.baseline;
 
   return (
-    <article
-      className={`rounded-2xl border-l-4 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md ${riskAccentClass(riskLevel)}`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <h3 className="text-[13px] font-medium leading-snug text-gray-500">{route.name}</h3>
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeClass(riskLevel)}`}>
-          {riskLevel}
-        </span>
-      </div>
-
-      <div className="mt-5">
-        <p className={`text-[28px] font-bold leading-tight ${riskTextClass(riskLevel)}`}>
-          Leave by {recommendedDeparture} tomorrow
-        </p>
-      </div>
-
-      <div className="mt-4">
-        <p className="text-xs font-medium text-gray-400">
-          <span className={trafficUnavailable ? "text-gray-400" : predictedTextClass(ratio)}>
-            {trafficUnavailable ? "—" : scoringMinutes} min predicted
-          </span>{" "}
-          · {route.baseline} min usual
-        </p>
-      </div>
-
-      {signals.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-2">
-          {signals.map((signal) => (
-            <span key={signal} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-              ⏱ {signal}
-            </span>
-          ))}
+    <article className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow duration-150 hover:shadow-md">
+      {/* thin colored top bar — risk only */}
+      <div style={{ height: 3, background: rc.bar }} />
+      <div className="p-5">
+        {/* Route name + risk badge */}
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-[13px] font-semibold leading-snug text-gray-700">{route.name}</h3>
+          <span className={`shrink-0 rounded px-2 py-0.5 text-[11px] font-bold ring-1 ${rc.badge} ${rc.ring}`}>
+            {riskLevel.toUpperCase()}
+          </span>
         </div>
-      )}
+
+        {/* Departure */}
+        <div className="mt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Depart by</p>
+          <p className="mt-1 text-[24px] font-bold leading-none tracking-tight text-gray-900">{departure}</p>
+          <p className="mt-1 text-[12px] text-gray-400">
+            usual {route.usualDeparture.replace("am"," AM").replace("pm"," PM")}
+          </p>
+        </div>
+
+        {/* Travel time */}
+        <div className="mt-4 flex items-center gap-1.5 text-[12px]">
+          <span className={over && !trafficUnavailable ? "font-semibold" : "text-gray-400"} style={over && !trafficUnavailable ? { color: rc.text } : {}}>
+            {trafficUnavailable ? "—" : `${mins} min`}
+          </span>
+          {!trafficUnavailable && (
+            <>
+              <span className="text-gray-300">·</span>
+              <span className="text-gray-400">{route.baseline} min usual</span>
+              {over && <span className="font-semibold" style={{ color: rc.text }}>(+{mins - route.baseline} min)</span>}
+            </>
+          )}
+        </div>
+
+        {/* Signals — no emojis, plain text tags */}
+        {signals.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {signals.map(sig => (
+              <span key={sig} className="rounded bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">{sig}</span>
+            ))}
+          </div>
+        )}
+      </div>
     </article>
   );
 }
 
+// ── Performance Table ─────────────────────────────────────────────────────────
+
 function PerformanceTable() {
   return (
     <section className="mt-8">
-      <h2 className="text-lg font-semibold text-gray-800">30-Day Route Performance</h2>
-
-      <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100 text-left text-sm">
-            <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-400">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Route</th>
-                <th className="px-5 py-3 font-semibold">Risk Level</th>
-                <th className="px-5 py-3 font-semibold">Avg Extra Time</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {scorecardRows.map(([route, risk, extraTime]) => (
-                <tr key={route} className="transition hover:bg-gray-50">
-                  <td className="px-5 py-4 font-medium text-gray-900">{route}</td>
-                  <td className="px-5 py-4 text-gray-700">
-                    <span className="inline-flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${riskDotClass(risk)}`} />
+      <SectionHeader label="30-Day Route Performance" sub="Based on operator trip logs · Updates weekly" />
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <table className="min-w-full divide-y divide-gray-100 text-left text-[13px]">
+          <thead className="bg-gray-50">
+            <tr>
+              {["Route","Risk (30d)","Avg Extra Time"].map(h => (
+                <th key={h} className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {scorecardRows.map(([route, risk, extra]) => {
+              const rc = riskColor(risk);
+              return (
+                <tr key={route} className="transition-colors hover:bg-gray-50">
+                  <td className="px-5 py-3.5 font-medium text-gray-800">{route}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="inline-flex items-center gap-2 text-gray-600">
+                      <span className="h-2 w-2 rounded-full" style={{ background: rc.dot }} />
                       {risk}
                     </span>
                   </td>
-                  <td className="px-5 py-4 text-gray-700">{extraTime}</td>
+                  <td className="px-5 py-3.5 font-semibold text-gray-700">{extra}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-
-      <p className="mt-3 text-sm text-gray-500">Historical data based on operator trip logs. Updates weekly.</p>
     </section>
   );
 }
