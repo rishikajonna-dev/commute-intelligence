@@ -75,7 +75,7 @@ function logErr(api, ctx, err) { console.error(`${api} API error`, { ctx, ...err
 async function fetchRouteEta(route) {
   const key = import.meta.env.REACT_APP_ORS_KEY;
   const url = key 
-    ? `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${key}&start=${route.start.lng},${route.start.lat}&end=${route.end.lng},${route.end.lat}`
+    ? `https://api.heigit.org/openrouteservice/v2/directions/driving-car?api_key=${key}&start=${route.start.lng},${route.start.lat}&end=${route.end.lng},${route.end.lat}`
     : `/api/directions?start=${route.start.lng},${route.start.lat}&end=${route.end.lng},${route.end.lat}`;
   const res = await fetch(url); if (!res.ok) throw await readErr(res);
   const data = await res.json();
