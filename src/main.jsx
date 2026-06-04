@@ -132,7 +132,6 @@ function riskColor(level) {
 function App() {
   const [routeStates, setRouteStates] = useState(() => routes.map(r => ({ route: r, loading: true, predictedMinutes: null, trafficUnavailable: false })));
   const [rainProb, setRainProb] = useState(0);
-  const [trafficFailed, setTrafficFailed] = useState(false);
   const [weatherFailed, setWeatherFailed] = useState(false);
   const [shiftStart, setShiftStart] = useState("8:00am");
   const [scenario, setScenario] = useState("live");
@@ -142,7 +141,7 @@ function App() {
     fetchRainProbability().then(p => { if (alive) setRainProb(p); }).catch(e => { logErr("OWM","forecast",e); if (alive) { setWeatherFailed(true); setRainProb(0); } });
     Promise.all(routes.map(async r => {
       try { const m = await fetchRouteEta(r); return { route: r, loading: false, predictedMinutes: m, trafficUnavailable: false }; }
-      catch(e) { logErr("ORS", r.name, e); if (alive) setTrafficFailed(true); return { route: r, loading: false, predictedMinutes: null, trafficUnavailable: true }; }
+      catch(e) { logErr("ORS", r.name, e); return { route: r, loading: false, predictedMinutes: null, trafficUnavailable: true }; }
     })).then(results => { if (alive) setRouteStates(results); });
     return () => { alive = false; };
   }, []);
@@ -165,7 +164,7 @@ function App() {
       <main className="min-h-screen lg:pl-[240px]">
         <Header todayLabel={todayLabel} shiftStart={shiftStart} setShiftStart={setShiftStart} />
         <div className="px-6 py-6 sm:px-8 lg:py-8">
-          {(trafficFailed || weatherFailed) && <WarningBanners trafficFailed={trafficFailed} weatherFailed={weatherFailed} />}
+          {weatherFailed && <WarningBanners />}
           <ScenarioSelector scenario={scenario} setScenario={setScenario} />
           <SectionHeader label="Tomorrow's Route Risk" sub={tomorrowLabel} />
           <SummaryBar summaries={summaries} />
@@ -291,11 +290,10 @@ function SummaryBar({ summaries }) {
 
 // ── Warning Banners ───────────────────────────────────────────────────────────
 
-function WarningBanners({ trafficFailed, weatherFailed }) {
+function WarningBanners() {
   return (
-    <div className="mb-5 space-y-2">
-      {trafficFailed && <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] font-medium text-amber-700">Traffic API unavailable — travel times estimated from baseline data</div>}
-      {weatherFailed && <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] font-medium text-amber-700">Weather API unavailable — rain signal excluded from scoring</div>}
+    <div className="mb-5">
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] font-medium text-amber-700">Weather API unavailable — rain signal excluded from scoring</div>
     </div>
   );
 }
